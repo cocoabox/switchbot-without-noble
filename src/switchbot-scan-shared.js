@@ -1,4 +1,4 @@
-const SwitchbotAdvertising = require('../node_modules/node-switchbot/lib/switchbot-advertising');
+const SwitchbotAdvertising = require('./switchbot-advertising');
 const {EventEmitter} = require('events');
 
 class SwitchbotScanShared extends EventEmitter {
