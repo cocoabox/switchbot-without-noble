@@ -1,4 +1,4 @@
 .private/
 .idea/
 node_modules/
-modules/
+modules/node-switchbot/
