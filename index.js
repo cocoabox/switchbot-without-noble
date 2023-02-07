@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const getopts = require('getopts');
 const os = require('os');
 const Lescan = require('./src/lescan');

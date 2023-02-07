@@ -134,7 +134,7 @@ For other devices, success is indicated by `true` printed to stdout followed by 
 For error, error JSON is printed to stdout followed by non-zero exit code. Example:
 
 ```json
-{ error: 'invalid-command' }
+{ "error": "invalid-command" }
 ```
 
  
