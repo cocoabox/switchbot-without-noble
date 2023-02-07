@@ -1,0 +1,15 @@
+{
+  "name": "switchbot-without-noble",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ble-packet-parser": "^0.1.0",
+    "getopts": "^2.3.0"
+  }
+}
