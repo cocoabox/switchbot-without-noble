@@ -1,9 +1,11 @@
 const getopts = require('getopts');
 const os = require('os');
+const Lescan = require('./src/lescan');
 const SwitchbotScan = require('./src/switchbot-scan');
+const SwitchbotScanShared = require('./src/switchbot-scan-shared');
 const switchbot_do = require('./src/switchbot-do');
 
-module.exports = Object.assign({} , switchbot_do , {SwitchbotScan});
+module.exports = Object.assign({} , switchbot_do , {SwitchbotScan , SwitchbotScanShared , Lescan});
 
 async function do_scan(options) {
     const {hci , time} = options;

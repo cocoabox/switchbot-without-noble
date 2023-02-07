@@ -1,13 +1,17 @@
 {
   "name": "switchbot-without-noble",
   "version": "1.0.0",
-  "description": "",
+  "description": "switchbot without noble",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cocoabox/switchbot-without-noble"
+  },
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "ble-packet-parser": "^0.1.0",
     "getopts": "^2.3.0",

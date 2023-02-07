@@ -69,7 +69,7 @@ class Lescan extends EventEmitter {
         this.#is_stopped = false;
         const my_spawn = (cmd , args , {on_stdout , on_stderr , on_exit} = {}) =>
             new Promise((resolve , reject) => {
-                // console.log('Run:' , cmd , args);
+                // console.warn('Run:' , cmd , args);
                 const child = child_process.spawn(cmd , args);
                 child.stdout.setEncoding('utf8');
                 if ( on_stdout ) child.stdout.on('data' , on_stdout);
