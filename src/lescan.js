@@ -8,7 +8,7 @@ function sleep(msec) {
     });
 }
 
-function my_spawn(cmd , args , {on_stdout , on_stderr , on_exit} = {}) {
+function my_spawn(cmd , args , {on_stdout , on_stderr , on_exit , on_spawn , resolve_on_close} = {}) {
     return new Promise((resolve , reject) => {
         // console.warn('Run:' , cmd , args.join(' '));
         const child = child_process.spawn(cmd , args);
@@ -18,7 +18,13 @@ function my_spawn(cmd , args , {on_stdout , on_stderr , on_exit} = {}) {
         if ( on_stderr ) child.stderr.on('data' , on_stderr);
         if ( on_exit ) child.on('exit' , on_exit);
         child.on('error' , error => reject({cmd , args , error}));
-        child.on('spawn' , () => resolve(child));
+        child.on('spawn' , resolve_on_close ? () => on_spawn : () => resolve(child));
+        if ( resolve_on_close ) {
+            child.on('close' , (exit_code) => {
+                if ( exit_code === 0 ) resolve();
+                else reject({exit_code});
+            });
+        }
     });
 }
 
@@ -75,9 +81,9 @@ class Lescan extends EventEmitter {
 
     async reset() {
         try {
-            await my_spawn('hciconfig' , [this.#hci_device_name , 'reset']);
-            await my_spawn('hciconfig' , [this.#hci_device_name , 'down']);
-            await my_spawn('hciconfig' , [this.#hci_device_name , 'up']);
+            await my_spawn('hciconfig' , [this.#hci_device_name , 'reset'] , {resolve_on_close : true});
+            await my_spawn('hciconfig' , [this.#hci_device_name , 'down'] , {resolve_on_close : true});
+            await my_spawn('hciconfig' , [this.#hci_device_name , 'up'] , {resolve_on_close : true});
             await sleep(100);
         } catch (rejection) {
             console.warn('error while resetting hci device :' , rejection);
