@@ -1,3 +1,0 @@
-[submodule "modules/node-switchbot"]
-	path = modules/node-switchbot
-	url = https://github.com/OpenWonderLabs/node-switchbot

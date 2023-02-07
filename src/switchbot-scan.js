@@ -1,5 +1,5 @@
 const Lescan = require('./lescan');
-const SwitchbotAdvertising = require('../modules/node-switchbot/lib/switchbot-advertising');
+const SwitchbotAdvertising = require('../node_modules/node-switchbot/lib/switchbot-advertising');
 
 class SwitchbotScan extends Lescan {
 

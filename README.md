@@ -13,14 +13,19 @@ Make sure you have the `hcitool` `hcidump` and `gatttool` commands installed on 
 ## installation
 
 ```sh 
-git clone --recurse-submodules "https://github.com/cocoabox/switchbot-without-noble"
+git clone "https://github.com/cocoabox/switchbot-without-noble"
 cd switchbot-without-noble
 npm i
 ```
 
 ## programmatic usage
 
-First, clone this repo as a git submodule in your project, then require using the following:
+First, install via npm
+
+```shell
+npm i 'github:cocoabox/switchbot-without-noble'
+```
+Then require using the followings:
 
 ```js 
 const {switchbot_plugmini_do , switchbot_bot_do , switchbot_curtain_do, SwitchbotScan} = require('modules/switchbot-without-noble');

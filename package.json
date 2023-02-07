@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "ble-packet-parser": "^0.1.0",
-    "getopts": "^2.3.0"
+    "getopts": "^2.3.0",
+    "node-switchbot": "github:cocoabox/node-switchbot#no-noble"
   }
 }

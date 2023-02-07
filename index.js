@@ -1,4 +1,5 @@
 const getopts = require('getopts');
+const os = require('os');
 const SwitchbotScan = require('./src/switchbot-scan');
 const switchbot_do = require('./src/switchbot-do');
 
@@ -70,9 +71,13 @@ async function do_operate(options) {
 
 if ( require.main === module ) {
     (async () => {
+        if ( os.platform() !== 'linux' ) {
+            console.warn('This application is for Linux only');
+            return process.exit(1);
+        }
         const command = process.argv.splice(2 , 1)?.[0]?.toLowerCase();
         if ( ! command ) {
-            console.warn(`usage: node ${process.argv[1]} [COMMAND] [OPTS]`);
+            console.warn(`usage: node ${process.argv[1]} [COMMAND] [OPTS]\nFor detailed help, see README.md`);
             process.exit(1);
         }
         const options = getopts(process.argv.slice(2) , {
