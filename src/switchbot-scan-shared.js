@@ -23,7 +23,7 @@ class SwitchbotScanShared extends EventEmitter {
                 rssi : Math.round(avg_rssi) ,
                 advertisement : {
                     serviceData : [
-                        {data : serv_data ? Buffer.from(serv_data.reverse()) : null} ,
+                        {data : serv_data ? Buffer.from(serv_data) : null} ,
                     ] ,
                     manufacturerData : manu_data ? Buffer.from(manu_data) : null ,
                 }

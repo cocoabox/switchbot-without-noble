@@ -144,7 +144,7 @@ async function switchbot_curtain_do(hci_name , mac , curtain_command , {max_retr
     }[curtain_command] : generate_write_value(curtain_command);
     if ( ! write_value_ints ) throw {error : 'invalid-command'};
     const write_value_hex_str = write_value_ints.map(n => tohex(n)).join('');
-    console.log('calling switchbot_do' , hci_name , {random : mac} , write_value_hex_str , {max_retries});
+    // console.log('calling switchbot_do' , hci_name , {random : mac} , write_value_hex_str , {max_retries});
     const response = await switchbot_do(hci_name , {random : mac} , write_value_hex_str , {max_retries});
 
     if ( response?.success ) {

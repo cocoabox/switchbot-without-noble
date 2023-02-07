@@ -8,12 +8,30 @@ function sleep(msec) {
     });
 }
 
+function my_spawn(cmd , args , {on_stdout , on_stderr , on_exit} = {}) {
+    return new Promise((resolve , reject) => {
+        // console.warn('Run:' , cmd , args.join(' '));
+        const child = child_process.spawn(cmd , args);
+        child.stdout.setEncoding('utf8');
+        if ( on_stdout ) child.stdout.on('data' , on_stdout);
+        child.stderr.setEncoding('utf8');
+        if ( on_stderr ) child.stderr.on('data' , on_stderr);
+        if ( on_exit ) child.on('exit' , on_exit);
+        child.on('error' , error => reject({cmd , args , error}));
+        child.on('spawn' , () => resolve(child));
+    });
+}
+
+let last = '';
+
 class Lescan extends EventEmitter {
     #hci_device_name;
 
     constructor(hci_device_name = 'hci0') {
         super();
         this.#hci_device_name = hci_device_name;
+        this.#is_stopping = false;
+        this.#is_stopped = true;
     }
 
     #hcidump_process;
@@ -55,39 +73,41 @@ class Lescan extends EventEmitter {
     #is_stopping;
     #is_stopped;
 
+    async reset() {
+        try {
+            await my_spawn('hciconfig' , [this.#hci_device_name , 'reset']);
+            await my_spawn('hciconfig' , [this.#hci_device_name , 'down']);
+            await my_spawn('hciconfig' , [this.#hci_device_name , 'up']);
+            await sleep(100);
+        } catch (rejection) {
+            console.warn('error while resetting hci device :' , rejection);
+        }
+    }
+
     /**
      * starts dumping; returns a Promise that resolves once dumping has started.
      * if command not found or hci interface not found, then rejects
      * @returns {Promise}
      */
     async start() {
-        if ( this.#hcidump_process || this.#lescan_process ) {
-            return;
+        // console.warn('lescan start');
+        if ( (! this.#is_stopped) || this.#is_stopping ) {
+            console.warn('not stopped, or is stopping');
+            throw {error : 'not-stopped'};
         }
         this.#merged_dumps = {};
         this.#is_stopping = false;
         this.#is_stopped = false;
-        const my_spawn = (cmd , args , {on_stdout , on_stderr , on_exit} = {}) =>
-            new Promise((resolve , reject) => {
-                // console.warn('Run:' , cmd , args);
-                const child = child_process.spawn(cmd , args);
-                child.stdout.setEncoding('utf8');
-                if ( on_stdout ) child.stdout.on('data' , on_stdout);
-                child.stderr.setEncoding('utf8');
-                if ( on_stderr ) child.stderr.on('data' , on_stderr);
-                if ( on_exit ) child.on('exit' , on_exit);
-                child.on('error' , error => reject({cmd , args , error}));
-                child.on('spawn' , () => resolve(child));
-            });
-        let last = '';
+
         try {
             this.#hcidump_process = await my_spawn('hcidump' , ['-x' , '-R' , '-i' , this.#hci_device_name] ,
                 {
-                    on_exit : (exit_code) => {
+                    on_exit : async (exit_code) => {
                         this.#hcidump_process = null;
                         if ( ! this.#is_stopping ) {
-                            // console.log('hcidump stopped unexpectedly' , exit_code);
-                            this.stop();
+                            console.log('hcidump stopped unexpectedly' , exit_code);
+                            await this.stop();
+                            this.#emit_terminated();
                         }
                     } ,
                     on_stdout : (str) => {
@@ -113,24 +133,43 @@ class Lescan extends EventEmitter {
                         console.warn('hcidump:' , str);
                     } ,
                 });
+            // console.warn('#hcidump_process:' , this.#hcidump_process);
+
             this.#lescan_process = await my_spawn('hcitool' , ['lescan' , '--duplicates' , '--discovery=g'] ,
                 {
-                    on_exit : (exit_code) => {
+                    on_exit : async (exit_code) => {
                         this.#lescan_process = null;
                         if ( ! this.#is_stopping ) {
-                            // console.log('hcitool stopped unexpectedly' , exit_code);
-                            this.stop();
+                            console.warn('hcitool stopped unexpectedly' , exit_code);
+                            await this.stop();
+                            this.#emit_terminated();
                         }
                     } ,
                     on_stderr : (str) => {
                         console.warn('hcitool:' , str);
                     } ,
                 });
+            // console.warn('#lescan_process:' , this.#lescan_process);
+
         } catch (e) {
             const {cmd , error} = e;
             throw {error : 'spawn-error' , cmd , reason : error};
         }
         this.#setup_report_dumps_timer();
+    }
+
+    /**
+     * when either lescan/hcidump process terminates, one or more calls to emit_terminated() will be made
+     * avoid this by setting a timer
+     */
+    #emit_terminate_timer;
+
+    #emit_terminated() {
+        if ( this.#emit_terminate_timer ) clearTimeout(this.#emit_terminate_timer);
+        this.#emit_terminate_timer = setTimeout(() => {
+            this.emit('terminated');
+            this.#emit_terminate_timer = null;
+        } , 500);
     }
 
     /**
@@ -142,9 +181,11 @@ class Lescan extends EventEmitter {
         clearTimeout(this.#report_dumps_timer);
         this.#is_stopping = true;
         if ( this.#hcidump_process ) {
+            // console.log('killing hcidump');
             this.#hcidump_process.kill(15);
         }
         if ( this.#lescan_process ) {
+            // console.log('killing lescan');
             this.#lescan_process.kill(15);
         }
         this.#hcidump_process = null;
