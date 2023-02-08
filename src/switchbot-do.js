@@ -20,11 +20,16 @@ function tohex(int) {
  * @param max_retries
  * @returns {Promise<{success: boolean, response, gatttool_exit_value: number}>}
  */
-async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
+async function switchbot_do(hci_name , mac , write_value , {max_retries , log , warn} = {}) {
+    const do_log = typeof log === 'function' ? log : () => {
+    };
+    const do_warn = typeof warn === 'function' ? warn : () => {
+    };
     // console.warn('switchbot_do' , {hci_name , mac , write_value , max_retries});
     max_retries = max_retries ?? 20;
     try {
         let response;
+        do_log('launching gatttool');
         const gatttool_exit_value = await gatttool(hci_name , mac ,
             async ({
                        connect ,
@@ -36,7 +41,7 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
             ) => {
                 let retries = 0;
                 // issue gatt connect command
-                // console.warn('connect');
+                do_log('connect');
                 while (true) {
                     try {
                         await connect();
@@ -46,7 +51,7 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
                         await sleep(500);
                     }
                     if ( ++retries > max_retries ) {
-                        console.warn('failed to connect, give up');
+                        do_warn('failed to connect, give up');
                         throw {where : 'connect' , give_up : true};
                     }
                 }
@@ -62,12 +67,12 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
                                 return await characteristics();
                                 break;
                             } catch (err) {
-                                console.warn('error getting all characteristics' , err);
+                                do_warn('error getting all characteristics' , err);
                                 if ( err.error ) {
                                     throw {where : 'characteristics' , 'fatal-error' : err.error};
                                 }
                                 if ( ++get_chars_retries > max_retries ) {
-                                    console.warn('failed to get characteristics, give up');
+                                    do_warn('failed to get characteristics, give up');
                                     throw {where : 'characteristics' , give_up : true};
                                 }
                                 await sleep(500);
@@ -75,15 +80,15 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
                         }
                     })();
                     // next find the char with specific UUID
-                    // console.warn('all chars' , JSON.stringify(all_chars , '' , 4));
+                    do_log('all chars' , JSON.stringify(all_chars , '' , 4));
                     value_handle = all_chars?.characteristics.find(c => c.uuid === char_uuid
                         && c.char_properties_list.includes(expected_char_property))?.value_handle;
                     // got it ? leave loop
-                    // console.warn('value_handle' , value_handle);
+                    do_log('value_handle' , value_handle , '.. was looking for' , char_uuid , 'with property' , expected_char_property);
                     if ( value_handle ) break;
                     // couldn't find value, try again after 500 msec
                     if ( ++retries > max_retries ) {
-                        console.warn('failed to find characteristics, give up');
+                        do_warn('failed to find characteristics, give up');
                         throw {where : 'characteristic-find' , give_up : true};
                     }
                     await sleep(500);
@@ -91,23 +96,24 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
                 // write characteristic to toggle the device
                 retries = 0;
                 while (true) {
-                    // console.warn('char_write_req' , value_handle , write_value);
+                    do_log('char_write_req' , value_handle , write_value);
                     try {
                         response = await char_write_req(value_handle , write_value);
                         break;
                     } catch (err) {
-                        console.warn('error while char_write_req' , err);
+                        do_warn('error while char_write_req' , err);
                         if ( err.error ) {
                             throw {where : 'char-write-req' , 'fatal-error' : err.error};
                         }
                         if ( ++retries > max_retries ) {
-                            console.warn('failed to write, give up');
+                            do_warn('failed to write, give up');
                             throw {where : 'char-write-req' , give_up : true};
                         }
                         await sleep(500);
                     }
                 }
                 // close gatttool
+                do_log('exit gatttool');
                 await exit();
             });
         return {success : true , response , gatttool_exit_value};
@@ -127,7 +133,11 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries} = {}) {
  * @param {number?} max_retries
  * @returns {Promise<boolean>}
  */
-async function switchbot_curtain_do(hci_name , mac , curtain_command , {max_retries} = {}) {
+async function switchbot_curtain_do(hci_name , mac , curtain_command , {max_retries , log , warn} = {}) {
+    const do_log = typeof log === 'function' ? log : () => {
+    };
+    const do_warn = typeof warn === 'function' ? warn : () => {
+    };
     const generate_write_value = ({percent , mode} = {}) => {
         const mode_num = {
             performance : 0 ,
@@ -144,9 +154,9 @@ async function switchbot_curtain_do(hci_name , mac , curtain_command , {max_retr
     }[curtain_command] : generate_write_value(curtain_command);
     if ( ! write_value_ints ) throw {error : 'invalid-command'};
     const write_value_hex_str = write_value_ints.map(n => tohex(n)).join('');
-    // console.log('calling switchbot_do' , hci_name , {random : mac} , write_value_hex_str , {max_retries});
-    const response = await switchbot_do(hci_name , {random : mac} , write_value_hex_str , {max_retries});
-
+    do_log('calling switchbot_do' , hci_name , {random : mac} , write_value_hex_str , {max_retries});
+    const response = await switchbot_do(hci_name , {random : mac} , write_value_hex_str , {max_retries , log , warn});
+    do_log('switchbot_do result' , response);
     if ( response?.success ) {
         return true;
     } else {
@@ -163,7 +173,7 @@ async function switchbot_curtain_do(hci_name , mac , curtain_command , {max_retr
  * @param max_retries
  * @returns {Promise<boolean>}
  */
-async function switchbot_bot_do(hci_name , mac , bot_command , {max_retries} = {}) {
+async function switchbot_bot_do(hci_name , mac , bot_command , {max_retries , log , warn} = {}) {
     const write_value = {
         on : '570101' ,
         off : '570102' ,
@@ -172,7 +182,7 @@ async function switchbot_bot_do(hci_name , mac , bot_command , {max_retries} = {
         up : '570104' ,
     }[bot_command];
     if ( ! write_value ) throw {error : 'invalid-command'};
-    const response = await switchbot_do(hci_name , {random : mac} , write_value , {max_retries});
+    const response = await switchbot_do(hci_name , {random : mac} , write_value , {max_retries , log , warn});
     if ( response?.success ) {
         return true;
     } else {
@@ -189,14 +199,14 @@ async function switchbot_bot_do(hci_name , mac , bot_command , {max_retries} = {
  * @param {number?} max_retries max retries for each gatt command, default 20
  * @returns {Promise<string>} resolves with "on" or "off" depending on the final state of the plugmini
  */
-async function switchbot_plugmini_do(hci_name , mac , plugmini_command , {max_retries} = {}) {
+async function switchbot_plugmini_do(hci_name , mac , plugmini_command , {max_retries , log , warn} = {}) {
     const write_value = {
         on : '570f50010180' ,
         off : '570f50010100' ,
         toggle : '570f50010280' ,
     }[plugmini_command];
     if ( ! write_value ) throw {error : 'invalid-command'};
-    const out = await switchbot_do(hci_name , mac , write_value , {max_retries});
+    const out = await switchbot_do(hci_name , mac , write_value , {max_retries , log , warn});
 
     switch ((out?.response?.output_values?.[0] ?? 0) << 8 | (out?.response?.output_values?.[1] ?? 0)) {
         case 0x0180:

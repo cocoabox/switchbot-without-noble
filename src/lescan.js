@@ -22,7 +22,7 @@ function my_spawn(cmd , args , {on_stdout , on_stderr , on_exit , on_spawn , res
         if ( resolve_on_close ) {
             child.on('close' , (exit_code) => {
                 if ( exit_code === 0 ) resolve();
-                else reject({exit_code});
+                else reject({exit_code , cmd , args});
             });
         }
     });
@@ -80,14 +80,23 @@ class Lescan extends EventEmitter {
     #is_stopped;
 
     async reset() {
-        try {
-            await my_spawn('hciconfig' , [this.#hci_device_name , 'reset'] , {resolve_on_close : true});
-            await my_spawn('hciconfig' , [this.#hci_device_name , 'down'] , {resolve_on_close : true});
-            await my_spawn('hciconfig' , [this.#hci_device_name , 'up'] , {resolve_on_close : true});
-            await sleep(100);
-        } catch (rejection) {
-            console.warn('error while resetting hci device :' , rejection);
+        const max_retry = 3;
+        let last_rejection;
+        for ( let i = 0; i < max_retry; ++i ) {
+            try {
+                await my_spawn('hciconfig' , [this.#hci_device_name , 'down'] , {resolve_on_close : true});
+                await sleep(200);
+                await my_spawn('hciconfig' , [this.#hci_device_name , 'up'] , {resolve_on_close : true});
+                await sleep(200);
+                return;
+            } catch (rejection) {
+                await sleep(1000);
+                last_rejection = rejection;
+                continue;
+            }
         }
+        throw last_rejection;
+
     }
 
     /**

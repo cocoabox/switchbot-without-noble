@@ -201,15 +201,15 @@ function gatttool(hci_name , mac , operations) {
             }
         };
         const characteristics = async () => {
-            const char_output_regex = /^(.*[\r\n]?)?handle: (.*?), char properties: (.*?), char value handle: (.*)?, uuid: (.*)$/;
+            const char_output_regex = /handle: (.*?), char properties: (.*?), char value handle: (.*)?, uuid: ([0-9,a-f,A-F,\-]+)/;
             const {output , matches} = await send_and_expect('characteristics' , {expect : char_output_regex});
             const characteristics = matches.map(mat => {
                 return {
-                    char_handle : mat[2] ,
-                    char_properties : mat[3] ,
-                    char_properties_list : char_properties(mat[3]) ,
-                    value_handle : mat[4] ,
-                    uuid : mat[5] ,
+                    char_handle : mat[1] ,
+                    char_properties : mat[2] ,
+                    char_properties_list : char_properties(mat[2]) ,
+                    value_handle : mat[3] ,
+                    uuid : mat[4] ,
                 };
             });
             return {output , characteristics , success : true};
