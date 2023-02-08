@@ -66,14 +66,22 @@ function char_properties(hex) {
  *      resolves if user operations all went well successfully
  *      rejects if gatttool fails to run, or if user operations threw an exception
  */
-function gatttool(hci_name , mac , operations) {
+function gatttool(hci_name , mac , operations , {log , warn} = {}) {
+    const do_log = typeof log === 'function' ? log : () => {
+    };
+    const do_warn = typeof warn === 'function' ? warn : () => {
+    };
+    const gattool_action_timeout_msec = 10 * 1000;
+    const gattool_action_interval_msec = 200;
     // console.warn('gatttool' , {hci_name , mac , operations});
     return new Promise(async (resolve , reject) => {
         const gatttool_args = mac.random
-            ? ['-t' , 'random' , '-b' , mac.random.toUpperCase() , '-i' , 'hci1' , '-I']
-            : ['-b' , mac.toUpperCase() , '-i' , 'hci1' , '-I'];
+            ? ['-t' , 'random' , '-b' , mac.random.toUpperCase() , '-i' , hci_name , '-I']
+            : ['-b' , mac.toUpperCase() , '-i' , hci_name , '-I'];
         const mac_address = mac.random ? mac.random.toUpperCase() : mac.toUpperCase();
+        do_log('GATTTOOL> gatttool' , gatttool_args.join(' '));
         const child = spawn('gatttool' , gatttool_args);
+        child.stdin.setEncoding('utf8');
         child.on('error' , error => {
             console.warn('gatttool error' , error);
             reject({error});
@@ -82,8 +90,8 @@ function gatttool(hci_name , mac , operations) {
         await sleep(500);
         const last_stdout = [];
         child.stdout.on('data' , (data) => {
+            do_log('GATTTOOL-DATA>' , data);
             const lines = data.split('\n').map(str => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g , '').trim());
-            // console.log(`stdout:` , lines);
             for ( let line of lines ) {
                 last_stdout.push(line);
             }
@@ -91,7 +99,7 @@ function gatttool(hci_name , mac , operations) {
         child.on('close' , (code) => {
             resolve(code);
         });
-        const expect_prompt = (timeout = 5000 , interval = 200) => new Promise(async (resolve , reject) => {
+        const expect_prompt = (timeout = gattool_action_timeout_msec , interval = gattool_action_interval_msec) => new Promise(async (resolve , reject) => {
             const timeout_timer = setTimeout(() => {
                 const output = [...last_stdout];
                 reject({timeout : true , output});
@@ -122,10 +130,11 @@ function gatttool(hci_name , mac , operations) {
             interval ,
             success_message
         } = {}) => new Promise(async (se_resolve , se_reject) => {
-            timeout = timeout ?? 5000;
-            interval = interval ?? 200;
+            timeout = timeout ?? gattool_action_timeout_msec;
+            interval = interval ?? gattool_action_interval_msec;
 
             child.stdin.write(`${send}\n`);
+
             last_stdout.length = 0;
             const captured_result = {};
             const timeout_timer = setTimeout(() => {
@@ -191,7 +200,7 @@ function gatttool(hci_name , mac , operations) {
             });
             if ( success ) {
                 // output contains success message AND write result
-                const output_values = output.map(o => o.match(/^Notification handle = (0x[0-9a-f]+) value: (.*)$/))
+                const output_values = output.map(o => o.match(/Notification handle = (0x[0-9a-f]+) value: ([0-9,\s]+)$/))
                     .filter(n => !! n)?.[0]?.[2]?.split(' ').map(n => parseInt(n , 16));
                 return {output , success : true , output_values};
             } else if ( error ) {

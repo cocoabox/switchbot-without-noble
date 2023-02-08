@@ -99,6 +99,7 @@ async function switchbot_do(hci_name , mac , write_value , {max_retries , log , 
                     do_log('char_write_req' , value_handle , write_value);
                     try {
                         response = await char_write_req(value_handle , write_value);
+                        do_log('char_write_req response :', response);
                         break;
                     } catch (err) {
                         do_warn('error while char_write_req' , err);
@@ -200,6 +201,10 @@ async function switchbot_bot_do(hci_name , mac , bot_command , {max_retries , lo
  * @returns {Promise<string>} resolves with "on" or "off" depending on the final state of the plugmini
  */
 async function switchbot_plugmini_do(hci_name , mac , plugmini_command , {max_retries , log , warn} = {}) {
+    const do_log = typeof log === 'function' ? log : () => {
+    };
+    const do_warn = typeof warn === 'function' ? warn : () => {
+    };
     const write_value = {
         on : '570f50010180' ,
         off : '570f50010100' ,
@@ -207,13 +212,14 @@ async function switchbot_plugmini_do(hci_name , mac , plugmini_command , {max_re
     }[plugmini_command];
     if ( ! write_value ) throw {error : 'invalid-command'};
     const out = await switchbot_do(hci_name , mac , write_value , {max_retries , log , warn});
-
+    do_log('switchbot_do output:' , out);
     switch ((out?.response?.output_values?.[0] ?? 0) << 8 | (out?.response?.output_values?.[1] ?? 0)) {
         case 0x0180:
             return 'on';
         case 0x0100:
             return 'off';
         default:
+            do_warn('OUT.response.output_values unexpected ; OUT =' , out);
             throw {error : 'unexpected-response' , response : out};
     }
 }

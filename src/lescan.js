@@ -33,11 +33,55 @@ let last = '';
 class Lescan extends EventEmitter {
     #hci_device_name;
 
-    constructor(hci_device_name = 'hci0') {
+    #log;
+    #warn;
+
+    constructor(hci_device_name = 'hci0' , {log , warn} = {}) {
         super();
+        this.#log = typeof log === 'function' ? log : () => {
+        };
+        this.#warn = typeof warn === 'function' ? warn : () => {
+        };
         this.#hci_device_name = hci_device_name;
         this.#is_stopping = false;
         this.#is_stopped = true;
+        this.#down_everthing_else();
+    }
+
+    async #down(hci_name) {
+        const max_retry = 3;
+        let last_rejection;
+        for ( let i = 0; i < max_retry; ++i ) {
+            try {
+                await my_spawn('hciconfig' , [hci_name , 'down'] , {resolve_on_close : true});
+                return;
+            } catch (rejection) {
+                await sleep(1000);
+                last_rejection = rejection;
+                continue;
+            }
+        }
+        throw last_rejection;
+    }
+
+    async #down_everthing_else() {
+        const stdout = [];
+        const exit_code = await my_spawn('hciconfig' , [] , {
+            on_stdout : str => stdout.push(str) ,
+            resolve_on_close : true ,
+        });
+        const hci_devices = Object.fromEntries(stdout.join('').split('\n\n')
+            .map(dev => dev.replaceAll(/[\n\t]/g , ' '))
+            .map(str => str.match(/^(.*?):.*?BD Address: (.*?) /))
+            .map(mat => mat ? [mat[1] , mat[2]] : null)
+            .filter(n => !! n)
+        );
+        this.#log('hci devices :' , hci_devices);
+        const down_these = Object.keys(hci_devices).filter(hci_name => hci_name !==  this.#hci_device_name);
+        for ( const down_this of down_these ) {
+            this.#log('hci down :' , down_this);
+            await this.#down(down_this);
+        }
     }
 
     #hcidump_process;
@@ -96,7 +140,25 @@ class Lescan extends EventEmitter {
             }
         }
         throw last_rejection;
+    }
 
+    async grand_reset() {
+        const max_retry = 3;
+        let last_rejection;
+        for ( let i = 0; i < max_retry; ++i ) {
+            try {
+                await my_spawn('service' , ['bluetooth' , 'restart'] , {resolve_on_close : true});
+                await sleep(200);
+                await my_spawn('service' , ['dbus' , 'restart'] , {resolve_on_close : true});
+                await sleep(200);
+                return;
+            } catch (rejection) {
+                await sleep(1000);
+                last_rejection = rejection;
+                continue;
+            }
+        }
+        throw last_rejection;
     }
 
     /**
